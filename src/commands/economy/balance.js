@@ -27,13 +27,15 @@ module.exports = {
       .setAuthor({ name: `${target.username}'s Aura Balance`, iconURL: target.displayAvatarURL({ dynamic: true }) })
       .setColor(0x9b59b6)
       .addFields(
-        { name: "💠 Aura", value: `${userData.aura.toLocaleString()} 💎`, inline: true },
-        { name: "🏆 Total Earned", value: `${userData.totalEarned.toLocaleString()} 💰`, inline: true },
-        { name: "💸 Total Spent", value: `${userData.totalSpent.toLocaleString()} 💸`, inline: true },
+        { 
+          name: "💠 Aura & Stats", 
+          value: `**Aura:** ${userData.aura.toLocaleString()} 💎\n**Earned:** ${userData.totalEarned.toLocaleString()} 💰 | **Spent:** ${userData.totalSpent.toLocaleString()} 💸`, 
+          inline: false 
+        },
         {
           name: "🔥 Streaks",
-          value: `**Daily:** ${userData.dailyStreak}\n**Weekly:** ${userData.weeklyStreak}\n**Monthly:** ${userData.monthlyStreak}`,
-          inline: false,
+          value: `Daily: ${userData.dailyStreak} | Weekly: ${userData.weeklyStreak} | Monthly: ${userData.monthlyStreak}`,
+          inline: false
         }
       )
       .setFooter({ text: `User ID: ${target.id}` })

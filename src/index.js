@@ -1,4 +1,5 @@
 require("dotenv").config();
+const BOT_ACTIVE = process.env.BOT_ACTIVE === "true";
 const fs = require("fs");
 const path = require("path");
 const { Client, Collection, IntentsBitField, REST, Routes } = require("discord.js");
@@ -170,4 +171,10 @@ client.on("messageCreate", async msg => {
 });
 
 // ---------------- Login ----------------
-client.login(process.env.TOKEN);
+if (BOT_ACTIVE) {
+  client.login(process.env.TOKEN);
+  console.log("✅ Bot is active and logging in...");
+} else {
+  console.log("⚠️ Bot is in maintenance mode. Not logging in.");
+}
+
