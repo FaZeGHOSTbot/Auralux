@@ -94,26 +94,28 @@ const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
 async function deployCommands() {
   try {
-    // Guild commands (instant update)
+    // 🧹 Optional: Clear guild commands if they exist
     if (process.env.GUILD_ID) {
-      console.log("📡 Registering commands to test server...");
+      console.log("🧹 Removing old guild commands...");
       await rest.put(
         Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-        { body: commandsData }
+        { body: [] } // clears all guild commands
       );
-      console.log("✅ Commands registered to test server!");
+      console.log("✅ All guild commands deleted!");
     }
 
-    // Global commands (optional)
-    if (process.env.DEPLOY_GLOBAL === "true") {
-      console.log("🌐 Registering global commands...");
-      await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commandsData });
-      console.log("✅ Global commands registered!");
-    }
+    // 🌍 Register only global commands
+    console.log("🌐 Registering global commands...");
+    await rest.put(
+      Routes.applicationCommands(process.env.CLIENT_ID),
+      { body: commandsData }
+    );
+    console.log("✅ Global commands registered successfully!");
   } catch (err) {
-    console.error("❌ Error registering commands:", err);
+    console.error("❌ Error deploying commands:", err);
   }
 }
+
 
 // Run deploy at startup
 deployCommands();
