@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const guildConfigSchema = new mongoose.Schema({
   guildId: { type: String, required: true, unique: true },
-  modRoleId: { type: String, default: null },
+  modRoleIds: { type: [String], default: [] }, // <-- change from single modRoleId
   logChannelId: { type: String, default: null },
 });
 

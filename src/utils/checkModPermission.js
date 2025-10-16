@@ -1,15 +1,19 @@
 const GuildConfig = require("../models/guildConfig");
+const { PermissionFlagsBits } = require("discord.js");
 
 module.exports = async function hasModPermission(interaction) {
-  const member = interaction.member;
-  if (!member) return false;
+  // Server admins are always allowed
+  if (interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return true;
 
-  // Allow admins
-  if (member.permissions.has("Administrator")) return true;
-
-  // Check custom moderator role
+  // Fetch server config
   const config = await GuildConfig.findOne({ guildId: interaction.guild.id });
-  if (!config || !config.modRoleId) return false;
+  if (!config) return false;
 
-  return member.roles.cache.has(config.modRoleId);
+  // Check for multiple mod roles
+  const modRoles = config.modRoleIds || [];
+  if (modRoles.length === 0) return false;
+
+  // Does member have at least one mod role?
+  const hasRole = interaction.member.roles.cache.some(role => modRoles.includes(role.id));
+  return hasRole;
 };
