@@ -2,7 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const User = require("../../models/race");
 
 // List of bot owner IDs
-const BOT_OWNERS = ["424568410765262848", "386109687692656640", "644600955295498249"];
+const BOT_OWNERS = ["424568410765262848", "386109687692656640", "644600955295498249","729614323978207323"];
 
 module.exports = {
   data: new SlashCommandBuilder()
