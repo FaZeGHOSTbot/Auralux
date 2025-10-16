@@ -1,8 +1,8 @@
 require("dotenv").config();
-const BOT_ACTIVE = process.env.BOT_ACTIVE === "false";
+const BOT_ACTIVE = String(process.env.BOT_ACTIVE || "").toLowerCase() === "true";
 const fs = require("fs");
 const path = require("path");
-const { Client, Collection, IntentsBitField, REST, Routes } = require("discord.js");
+const { Client, Collection, IntentsBitField, REST, Routes, Partials  } = require("discord.js");
 
 const express = require("express");
 const app = express();
@@ -32,7 +32,13 @@ const client = new Client({
     IntentsBitField.Flags.GuildMessages,
     IntentsBitField.Flags.MessageContent,
     IntentsBitField.Flags.GuildVoiceStates,
+    IntentsBitField.Flags.GuildMessageReactions,
   ],
+  partials: [
+    Partials.Message,   // <-- ADD THIS
+    Partials.Reaction,  // <-- ADD THIS
+    Partials.User       // <-- ADD THIS
+  ]
 });
 
 // ---------------- Load Event Logs ----------------
