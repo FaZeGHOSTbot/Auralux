@@ -6,10 +6,15 @@ const { Client, Collection, IntentsBitField, REST, Routes } = require("discord.j
 const express = require("express");
 const app = express();
 
-app.get("/", (req, res) => res.send("Bot is running!"));
+// Respond to both HEAD and GET requests
+app.use("/", (req, res) => {
+  res.status(200).send("Auralux bot is running!");
+});
+
 app.listen(process.env.PORT || 3000, () => {
   console.log("Web server is running on port " + (process.env.PORT || 3000));
 });
+
 
 
 
