@@ -15,7 +15,8 @@ module.exports = {
         // 🧠 Step 1: Owner-only protection
         const allowedOwners = [
             "424568410765262848", // 👈 replace this with your Discord user ID
-            // "SECOND_OWNER_ID"  // add more if needed
+            "644600955295498249",
+            "386109687692656640"  // add more if needed
         ];
 
         if (!allowedOwners.includes(interaction.user.id)) {
