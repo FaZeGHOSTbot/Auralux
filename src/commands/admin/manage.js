@@ -2,9 +2,11 @@ const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require("disc
 const Aura = require("../../models/aura");
 const User = require("../../models/user");
 
-const OWNER_IDS = ["424568410765262848",
-                    "644600955295498249",
-                    "386109687692656640" ]; // comma-separated IDs
+const OWNER_IDS = [
+  "424568410765262848",
+  "644600955295498249",
+  "386109687692656640"
+];
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -25,11 +27,13 @@ module.exports = {
               { name: "clear", value: "clear" }
             ))
         .addIntegerOption(opt => opt.setName("amount").setDescription("Amount of Aura (not needed for clear)")))
+
     .addSubcommand(sub =>
       sub
         .setName("streak")
         .setDescription("Clear streaks for a user")
         .addUserOption(opt => opt.setName("target").setDescription("User").setRequired(true)))
+
     .addSubcommand(sub =>
       sub
         .setName("resetlevels")
@@ -43,6 +47,7 @@ module.exports = {
 
     const sub = interaction.options.getSubcommand();
 
+    // --- AURA MANAGEMENT ---
     if (sub === "aura") {
       const target = interaction.options.getUser("target");
       const action = interaction.options.getString("action");
@@ -66,6 +71,7 @@ module.exports = {
       return interaction.reply(`✅ ${action} done for ${target.tag}. Current Aura: ${userData.aura}`);
     }
 
+    // --- STREAK MANAGEMENT ---
     if (sub === "streak") {
       const target = interaction.options.getUser("target");
       let userData = await Aura.findOne({ userId: target.id, guildId: interaction.guild.id });
@@ -79,7 +85,10 @@ module.exports = {
       return interaction.reply(`✅ Cleared all streaks for ${target.tag}`);
     }
 
+    // --- RESET LEVELS ---
     if (sub === "resetlevels") {
+      await interaction.deferReply(); // Let Discord know we're processing
+
       const target = interaction.options.getUser("target");
 
       if (target) {
@@ -89,17 +98,12 @@ module.exports = {
           userData.xp = 0;
           await userData.save();
         }
-        return interaction.reply(`✅ Reset level for ${target.tag}`);
+        return interaction.editReply(`✅ Reset level for ${target.tag}`);
       } else {
-        // Reset all users in the server
-        const users = await User.find({ guildId: interaction.guild.id });
-        for (const u of users) {
-          u.level = 1;
-          u.xp = 0;
-          await u.save();
-        }
-        return interaction.reply(`✅ Reset levels for all users in this server`);
+        // Bulk update all users in the server
+        await User.updateMany({ guildId: interaction.guild.id }, { level: 1, xp: 0 });
+        return interaction.editReply(`✅ Reset levels for all users in this server`);
       }
     }
-  },
+  }
 };
