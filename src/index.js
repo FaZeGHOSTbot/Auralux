@@ -3,11 +3,14 @@ const fs = require("fs");
 const path = require("path");
 const { Client, Collection, IntentsBitField, REST, Routes } = require("discord.js");
 
-const express = require('express');
+const express = require("express");
 const app = express();
 
-app.get('/', (req, res) => res.send('Bot is alive!'));
-app.listen(3000, () => console.log('Web server running on port 3000'));
+app.get("/", (req, res) => res.send("Bot is running!"));
+app.listen(process.env.PORT || 3000, () => {
+  console.log("Web server is running on port " + (process.env.PORT || 3000));
+});
+
 
 
 // Database + Models
