@@ -9,15 +9,14 @@ const app = express();
 
 // Respond to both HEAD and GET requests
 app.use("/", (req, res) => {
+  console.log(`[PING] Received a ${req.method} request at ${new Date().toLocaleTimeString()}`);
   res.status(200).send("Auralux bot is running!");
 });
+
 
 app.listen(process.env.PORT || 3000, () => {
   console.log("Web server is running on port " + (process.env.PORT || 3000));
 });
-
-
-
 
 // Database + Models
 const connectDB = require("./database");
@@ -185,4 +184,3 @@ if (BOT_ACTIVE) {
 } else {
   console.log("⚠️ Bot is in maintenance mode. Not logging in.");
 }
-
