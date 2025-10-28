@@ -4,9 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const { Client, Collection, IntentsBitField, REST, Routes, Partials } = require("discord.js");
 
-
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`🌐 Web server running on port ${port}`));
+const express = require("express");
+const app = express();
 
 // Database + Models
 const connectDB = require("./database");
@@ -164,8 +163,6 @@ client.on("messageCreate", async (message) => {
 });
 
 // --- Express keep-alive server for Render ---
-const express = require("express");
-const app = express();
 
 app.get("/", (req, res) => {
   res.send("Auralux bot is alive ✨");
