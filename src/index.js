@@ -2,17 +2,15 @@ require("dotenv").config();
 const BOT_ACTIVE = String(process.env.BOT_ACTIVE || "").toLowerCase() === "true";
 const fs = require("fs");
 const path = require("path");
-const { Client, Collection, IntentsBitField, REST, Routes, Partials  } = require("discord.js");
+const { Client, Collection, IntentsBitField, REST, Routes, Partials } = require("discord.js");
 
 const express = require("express");
 const app = express();
 
 // Respond to both HEAD and GET requests
 app.use("/", (req, res) => {
-  console.log(`[PING] Received a ${req.method} request at ${new Date().toLocaleTimeString()}`);
-  res.status(200).send("Auralux bot is running!");
+  res.status(200).send(`Auralux bot is running! Last ping: ${new Date().toLocaleString()}`);
 });
-
 
 app.listen(process.env.PORT || 3000, () => {
   console.log("Web server is running on port " + (process.env.PORT || 3000));
@@ -33,20 +31,25 @@ const client = new Client({
     IntentsBitField.Flags.GuildVoiceStates,
     IntentsBitField.Flags.GuildMessageReactions,
   ],
-  partials: [
-    Partials.Message,   // <-- ADD THIS
-    Partials.Reaction,  // <-- ADD THIS
-    Partials.User       // <-- ADD THIS
-  ]
+  partials: [Partials.Message, Partials.Reaction, Partials.User],
 });
 
 // ---------------- Load Event Logs ----------------
 const logs = require("./events/log");
 logs(client);
 
-// SYBAU command
-const messageCreateHandler = require("./events/messageCreate");
-messageCreateHandler(client);
+// 🔥 Load interactionCreate event manually
+client.on("interactionCreate", (interaction) => 
+  require("./events/interactionCreate")(client, interaction)
+);
+
+
+// 🟢 NEW: SpawnManager system
+const SpawnManager = require("./utils/spawnManager");
+const spawnManager = new SpawnManager(client);
+client.spawnManager = spawnManager;
+
+// 🟢 NEW: Hook into message activity for random spawns
 
 // ---------------- Load Commands ----------------
 client.commands = new Collection();
@@ -93,39 +96,41 @@ const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
 async function deployCommands() {
   try {
-    // 🧹 Optional: Clear guild commands if they exist
     if (process.env.GUILD_ID) {
-      console.log("🧹 Removing old guild commands...");
-      await rest.put(
+      console.log("📡 Registering slash commands to test server...");
+      const data = await rest.put(
         Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-        { body: [] } // clears all guild commands
+        { body: commandsData }
       );
-      console.log("✅ All guild commands deleted!");
+
+      console.log(`✅ Successfully registered ${data.length} commands to guild ${process.env.GUILD_ID}`);
+      console.log("🔍 Commands registered:");
+      for (const cmd of data) console.log(`   • /${cmd.name}`);
+      console.log("─────────────────────────────");
     }
 
-    // 🌍 Register only global commands
-    console.log("🌐 Registering global commands...");
-    await rest.put(
-      Routes.applicationCommands(process.env.CLIENT_ID),
-      { body: commandsData }
-    );
-    console.log("✅ Global commands registered successfully!");
+    if (process.env.DEPLOY_GLOBAL === "true") {
+      console.log("🌐 Registering global commands...");
+      const data = await rest.put(
+        Routes.applicationCommands(process.env.CLIENT_ID),
+        { body: commandsData }
+      );
+
+      console.log(`✅ Successfully registered ${data.length} global commands.`);
+      for (const cmd of data) console.log(`   • /${cmd.name}`);
+      console.log("─────────────────────────────");
+    }
   } catch (err) {
-    console.error("❌ Error deploying commands:", err);
+    console.error("❌ Error registering slash commands:", err);
   }
 }
 
-
-// Run deploy at startup
 deployCommands();
 
 // ---------------- Events ----------------
-
-// Bot Ready
 client.once("ready", async () => {
   console.log(`🤖 ${client.user.tag} is online!`);
 
-  // Ensure XP profiles exist
   for (const [guildId, guild] of client.guilds.cache) {
     await guild.members.fetch();
     for (const [memberId, member] of guild.members.cache) {
@@ -139,42 +144,31 @@ client.once("ready", async () => {
   }
 });
 
-// Handle Slash Commands
-client.on("interactionCreate", async interaction => {
-  if (!interaction.isChatInputCommand()) return;
-
-  const command = client.commands.get(interaction.commandName);
-  if (!command) return;
-
-  console.log(`⚡ Executing command: /${interaction.commandName} (User: ${interaction.user.tag})`);
-
-  try {
-    await command.execute(interaction, client);
-    console.log(`✅ Successfully executed: /${interaction.commandName}`);
-  } catch (error) {
-    console.error(`❌ Error executing /${interaction.commandName}:`, error);
-    await interaction.reply({ content: "❌ There was an error executing this command!", ephemeral: true });
-  }
-});
 
 // XP System
-client.on("messageCreate", async msg => {
-  if (msg.author.bot || !msg.guild) return;
+client.on("messageCreate", async (message) => {
+  if (!message.guild || message.author.bot) return;
 
-  const xpGain = Math.floor(Math.random() * 10) + 5;
-  let user = await User.findOne({ userId: msg.author.id, guildId: msg.guild.id });
-  if (!user) user = new User({ userId: msg.author.id, guildId: msg.guild.id, xp: 0, level: 1 });
+  try {
+    // Handle XP system normally
+    const xpGain = Math.floor(Math.random() * 10) + 5;
+    let user = await User.findOne({ userId: message.author.id, guildId: message.guild.id });
+    if (!user) user = new User({ userId: message.author.id, guildId: message.guild.id, xp: 0, level: 1 });
 
-  user.xp += xpGain;
-  const xpNeeded = user.level * 100;
+    user.xp += xpGain;
+    const xpNeeded = user.level * 100;
+    if (user.xp >= xpNeeded) {
+      user.level++;
+      user.xp -= xpNeeded;
+      message.channel.send(`🎉 <@${message.author.id}> leveled up to **Level ${user.level}**!`);
+    }
+    await user.save();
 
-  if (user.xp >= xpNeeded) {
-    user.level++;
-    user.xp -= xpNeeded;
-    msg.channel.send(`🎉 <@${msg.author.id}> leveled up to **Level ${user.level}**!`);
+    // 🔥 Let the spawn manager handle random card spawning
+    await spawnManager.handleMessage(message);
+  } catch (err) {
+    console.error("⚠️ Error in messageCreate event:", err);
   }
-
-  await user.save();
 });
 
 // ---------------- Login ----------------
