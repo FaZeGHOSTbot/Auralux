@@ -115,8 +115,8 @@ constructor(client) {
   this.spawnedCards = new Map();
   this.messageCounter = new Map();
   this.lastMessageTime = new Map();
-  this.IDLE_THRESHOLD = 1 * 60 * 1000; // 1 minute
-  this.AUTO_SPAWN_INTERVAL = 30 * 1000; // check every 30 sec (recommended)
+  this.IDLE_THRESHOLD = 60 * 60 * 1000; // 1 minute
+  this.AUTO_SPAWN_INTERVAL = 30 * 60 * 1000; // check every 30 sec (recommended)
 
   this.client.once("ready", async () => {
     console.log("✅ Idle spawn system activated.");
