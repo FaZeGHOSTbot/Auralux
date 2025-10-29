@@ -10,10 +10,10 @@ const cardsData = JSON.parse(fs.readFileSync(cardsFile, "utf8"));
 
 // 🎚️ Rarity system
 const RARITY_LEVELS = {
-  mortal: { chance: 60, color: 0x95a5a6, emoji: "🩶", multiplier: 1.0 },
-  ascended: { chance: 33, color: 0x3498db, emoji: "💠", multiplier: 1.2 },
-  mythic: { chance: 6, color: 0x9b59b6, emoji: "💜", multiplier: 1.5 },
-  divine: { chance: 1, color: 0xf1c40f, emoji: "✨", multiplier: 2.0 },
+  mortal: { chance: 60, color: 0x3498db, emoji: "🩶", multiplier: 1.0 },
+  ascended: { chance: 30, color: 0x3498db, emoji: "💠", multiplier: 1.2 },
+  mythic: { chance: 1, color: 0x3498db, emoji: "💜", multiplier: 2 },
+  divine: { chance: 0.3, color: 0x3498db, emoji: "✨", multiplier: 2.5 },
 };
 
 // 🎲 Random rarity generator
@@ -28,22 +28,37 @@ function getRandomRarity() {
 }
 
 // 🧬 Soul Potential with ultra-rare ends (0.1–99.99%)
+function gaussianRandom(mean = 0, stdDev = 1) {
+  // Box-Muller
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v) * stdDev + mean;
+}
+
+function gaussianRandom(mean = 0, stdDev = 1) {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v) * stdDev + mean;
+}
+
 function getRandomSP() {
-  const extremeChance = Math.random();
-  let sp;
-  if (extremeChance < 0.05) {
-    // 5% chance to roll extremely high or low
+  const sigma = 9; // increased from 7 → wider tails
+  let sp = gaussianRandom(50, sigma);
+
+  // increased rare-extreme chance
+  if (Math.random() < 0.004) { // 0.4% total (0.2% low + 0.2% high)
     sp = Math.random() < 0.5
-      ? Math.random() * 5 // 0–5%
-      : 95 + Math.random() * 5; // 95–100%
-  } else {
-    // Normal mid rolls (bell-like)
-    const base = Math.random() - 0.5; // -0.5 to +0.5
-    const curved = Math.pow(base * 2, 3); // cubic curve
-    sp = 50 + curved * 50;
+      ? Math.random() * 5         // 0–5%
+      : 95 + Math.random() * 5;   // 95–100%
   }
+
   return Math.min(99.99, Math.max(0.1, parseFloat(sp.toFixed(2))));
 }
+
+
+
 
 // 🩵 Visual Soul bar
 function getSPBar(sp) {
@@ -126,105 +141,114 @@ class SpawnManager {
   }
 
   async handleClaim(interaction, userRace) {
-    try {
-      await interaction.deferReply({ ephemeral: true });
+  try {
+    await interaction.deferReply({ ephemeral: true });
 
-      const channelId = interaction.channel.id;
-      const spawnData = this.spawnedCards.get(channelId);
+    const channelId = interaction.channel.id;
+    const spawnData = this.spawnedCards.get(channelId);
 
-      if (!spawnData || spawnData.claimed) {
-        return await interaction.editReply({ content: "❌ There’s no claimable card right now!" });
-      }
+    if (!spawnData || spawnData.claimed) {
+      return await interaction.editReply({ content: "❌ There’s no claimable card right now!" });
+    }
 
-      const { card, race, rarity } = spawnData;
-      const raceKeys = Object.keys(card.races).map(r => r.toLowerCase());
-      const normalizedUserRace = userRace.toLowerCase();
+    const { card, race, rarity } = spawnData;
+    const raceKeys = Object.keys(card.races).map(r => r.toLowerCase());
+    const normalizedUserRace = userRace.toLowerCase();
 
-      if (!raceKeys.includes(normalizedUserRace)) {
-        return await interaction.editReply({
-          content: `${card.name} doesn’t have a ${userRace} variant, so you can’t claim this one!`,
-        });
-      }
-
-      const matchedRaceKey = Object.keys(card.races).find(
-        r => r.toLowerCase() === normalizedUserRace
-      );
-      const raceVariant = card.races[matchedRaceKey];
-
-      const sp = getRandomSP();
-      const level = Math.floor(Math.random() * 10) + 1;
-      const scaledStats = scaleStats(raceVariant.stats, sp, level, rarity);
-
-      const user = await User.findOneAndUpdate(
-        { userId: interaction.user.id, guildId: interaction.guild.id },
-        { $setOnInsert: { userId: interaction.user.id, guildId: interaction.guild.id, userCardCounter: 0 } },
-        { upsert: true, new: true }
-      );
-        // 🧭 Get next global card ID
-let globalCounter = await GlobalCounter.findOneAndUpdate(
-  { name: "globalCardId" },
-  { $inc: { value: 1 } },
-  { new: true, upsert: true }
-);
-
-const globalCardId = globalCounter.value;
-
-// 🧍 Increment user's personal card counter safely
-user.userCardCounter = (user.userCardCounter || 0) + 1;
-
-// 🆕 Create the card with both IDs
-const newCard = {
-  globalCardId,              // 🌍 global numeric ID
-  userCardId: user.userCardCounter, // 👤 per-user numeric ID
-  name: card.name,
-  race: userRace,
-  rarity,
-  imageUrl: raceVariant.image,
-  soulPotential: sp,
-  stats: scaledStats,
-  level,
-};
-
-// 💾 Save card and user
-user.cards.push(newCard);
-await user.save();
-
-      spawnData.claimed = true;
-      const rarityInfo = RARITY_LEVELS[rarity];
-
-      const claimedEmbed = new EmbedBuilder()
-        .setTitle(`${rarityInfo.emoji} ${interaction.user.username} claimed **${card.name}**!`)
-        .setDescription(
-          `🧬 **Race:** ${userRace.charAt(0).toUpperCase() + userRace.slice(1)}\n` +
-          `💎 **Rarity:** ${rarity.toUpperCase()}\n` +
-          `🔥 **Soul Potential:** ${sp}% (${getSPBar(sp)})\n` +
-          `⚔️ **Level:** ${level}\n`+
-          `🆔 **Global ID:** #${globalCounter.value} | **Your Card ID:** #${user.userCardCounter}`
-        )
-        .setImage(raceVariant.image)
-        .setColor(rarityInfo.color)
-        .setFooter({ text: "Added to your collection!" });
-
-      await interaction.channel.messages
-        .fetch(spawnData.messageId)
-        .then(msg => msg.edit({ embeds: [claimedEmbed], components: [] }))
-        .catch(() => null);
-
-      await interaction.editReply({
-        content: `✅ You successfully claimed **${card.name}** (${rarity.toUpperCase()})!`,
+    if (!raceKeys.includes(normalizedUserRace)) {
+      return await interaction.editReply({
+        content: `${card.name} doesn’t have a ${userRace} variant, so you can’t claim this one!`,
       });
+    }
 
-      this.spawnedCards.delete(channelId);
-    } catch (err) {
-      console.error("❌ Interaction Error:", err);
-      if (!interaction.replied) {
-        await interaction.reply({
-          content: "⚠️ Something went wrong.",
-          ephemeral: true,
-        }).catch(() => null);
-      }
+    const matchedRaceKey = Object.keys(card.races).find(
+      r => r.toLowerCase() === normalizedUserRace
+    );
+    const raceVariant = card.races[matchedRaceKey];
+
+    const sp = getRandomSP();
+    const level = Math.floor(Math.random() * 10) + 1;
+    const scaledStats = scaleStats(raceVariant.stats, sp, level, rarity);
+
+    const user = await User.findOneAndUpdate(
+      { userId: interaction.user.id, guildId: interaction.guild.id },
+      { $setOnInsert: { userId: interaction.user.id, guildId: interaction.guild.id, userCardCounter: 0 } },
+      { upsert: true, new: true }
+    );
+
+    // 🧭 Get next global card ID
+    let globalCounter = await GlobalCounter.findOneAndUpdate(
+      { name: "globalCardId" },
+      { $inc: { value: 1 } },
+      { new: true, upsert: true }
+    );
+
+    const globalCardId = globalCounter.value;
+
+    // 🧍 Increment user's personal card counter safely
+    user.userCardCounter = (user.userCardCounter || 0) + 1;
+
+    // 🆕 Create the card with both IDs
+    const newCard = {
+      globalCardId,
+      userCardId: user.userCardCounter,
+      name: card.name,
+      race: userRace,
+      rarity,
+      imageUrl: raceVariant.image,
+      soulPotential: sp,
+      stats: scaledStats,
+      level,
+    };
+
+    // 💾 Save card and user
+    user.cards.push(newCard);
+    await user.save();
+
+    spawnData.claimed = true;
+    const rarityInfo = RARITY_LEVELS[rarity];
+
+    // 🖼️ Edit spawn embed (minimal info)
+    const claimedEmbed = new EmbedBuilder()
+      .setTitle(`${rarityInfo.emoji} ${card.name} has been claimed!`)
+      .setDescription(`🧬 **Race:** ${userRace.charAt(0).toUpperCase() + userRace.slice(1)}`)
+      .setImage(raceVariant.image)
+      .setColor(rarityInfo.color)
+      .setFooter({ text: "Added to the collection!" });
+
+    // 🪄 Update original spawn message (embed only)
+    await interaction.channel.messages
+      .fetch(spawnData.messageId)
+      .then(msg => msg.edit({ embeds: [claimedEmbed], components: [] }))
+      .catch(() => null);
+
+    // 💫 Fancy rarity display
+    const rarityDisplay = `${rarityInfo.emoji} **${rarity.toUpperCase()}**`;
+
+    // ✨ Send a beautiful text message (non-embed)
+    await interaction.channel.send(
+      `🎉 ${interaction.user.username} has claimed **${card.name}** ` +
+      `(${userRace.charAt(0).toUpperCase() + userRace.slice(1)}) — ${rarityDisplay} card!\n` +
+      `🧬 **Soul Potential:** ${sp}% | 🗡️ **Level:** ${level}`
+    );
+
+    await interaction.editReply({
+      content: `✅ You successfully claimed **${card.name}** (${rarity.toUpperCase()})!`,
+    });
+
+    this.spawnedCards.delete(channelId);
+  } catch (err) {
+    console.error("❌ Interaction Error:", err);
+    if (!interaction.replied) {
+      await interaction.reply({
+        content: "⚠️ Something went wrong.",
+        ephemeral: true,
+      }).catch(() => null);
     }
   }
+}
+
+
 }
 
 module.exports = SpawnManager;
