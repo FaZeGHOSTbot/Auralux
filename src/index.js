@@ -7,6 +7,15 @@ const { Client, Collection, IntentsBitField, REST, Routes, Partials } = require(
 const express = require("express");
 const app = express();
 
+// Respond to both HEAD and GET requests
+app.use("/", (req, res) => {
+  res.status(200).send(`Auralux bot is running! Last ping: ${new Date().toLocaleString()}`);
+});
+
+app.listen(process.env.PORT || 3000, () => {
+  console.log("Web server is running on port " + (process.env.PORT || 3000));
+});
+
 // Database + Models
 const connectDB = require("./database");
 const User = require("./models/user");
@@ -161,16 +170,6 @@ client.on("messageCreate", async (message) => {
     console.error("⚠️ Error in messageCreate event:", err);
   }
 });
-
-// --- Express keep-alive server for Render ---
-
-app.get("/", (req, res) => {
-  res.send("Auralux bot is alive ✨");
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🌐 Web server running on port ${PORT}`));
-
 
 // ---------------- Login ----------------
 if (BOT_ACTIVE) {

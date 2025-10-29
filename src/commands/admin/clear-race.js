@@ -1,40 +1,107 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const User = require("../../models/user");
-
-// List of bot owner IDs
-const BOT_OWNERS = ["424568410765262848", "386109687692656640", "644600955295498249","722429663435030618"];
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("clear-race")
-    .setDescription("Clear the race of a user (bot owners only)")
-    .addUserOption(option =>
-      option.setName("target")
-        .setDescription("The user whose race you want to clear")
-        .setRequired(true)
-    ),
+    .setName("clear-isekai")
+    .setDescription("⚠️ Deletes all players' xp, race, level, and cards (Owner only)")
+    .setDefaultPermission(false),
 
   async execute(interaction) {
-    if (!BOT_OWNERS.includes(interaction.user.id)) {
-      return interaction.reply({ content: "❌ You are not allowed to use this command!", ephemeral: true });
+    const ownerIds = process.env.OWNER_ID.split(",").map(id => id.trim());
+    if (!ownerIds.includes(interaction.user.id)) {
+      return interaction.reply({ content: "❌ Only bot owner(s) can use this command.", ephemeral: true });
     }
 
-    const target = interaction.options.getUser("target");
-    const user = await User.findOne({ userId: target.id });
+    // 🧠 Ask for confirmation
+    const confirmEmbed = new EmbedBuilder()
+      .setTitle("⚠️ Confirm Isekai Data Wipe")
+      .setDescription(
+        "This will **reset all players’ XP, level, race, and cards.**\n\n" +
+        "User accounts will stay — but all progress will be wiped.\n\nAre you absolutely sure?"
+      )
+      .setColor("Red")
+      .setFooter({ text: "You have 15 seconds to confirm." });
 
-    if (!user) {
-      return interaction.reply({ content: `⚠️ ${target.tag} does not have a race assigned.`, ephemeral: true });
-    }
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("confirm_clear")
+        .setLabel("✅ Yes, clear everything")
+        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId("cancel_clear")
+        .setLabel("❌ Cancel")
+        .setStyle(ButtonStyle.Secondary)
+    );
 
-    await User.deleteOne({ userId: target.id });
+    await interaction.reply({ embeds: [confirmEmbed], components: [row], ephemeral: true });
 
-    const embed = new EmbedBuilder()
-      .setColor(0xff0000)
-      .setTitle("🧹 Race Cleared")
-      .setDescription(`The race of **${target.tag}** has been removed.`)
-      .setFooter({ text: `Cleared by ${interaction.user.tag} | User ID: ${target.id}` })
-      .setTimestamp();
+    const collector = interaction.channel.createMessageComponentCollector({
+      filter: i => i.user.id === interaction.user.id,
+      time: 15000,
+    });
 
-    await interaction.reply({ embeds: [embed] });
-  }
+    collector.on("collect", async i => {
+      if (i.customId === "cancel_clear") {
+        await i.update({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle("❌ Cancelled")
+              .setDescription("No data was deleted.")
+              .setColor("Grey"),
+          ],
+          components: [],
+        });
+        collector.stop();
+        return;
+      }
+
+      if (i.customId === "confirm_clear") {
+        try {
+          // 🗑️ Reset specific fields for all users
+          const result = await User.updateMany(
+            {},
+            {
+              $set: { xp: 0, level: 1, race: null, userCardCounter: 0 },
+              $unset: { cards: 1 },
+            }
+          );
+
+          await i.update({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle("🔥 All Player Data Cleared")
+                .setDescription(
+                  `All players’ **XP, Level, Race, and Cards** have been wiped.\n` +
+                  `Affected documents: **${result.modifiedCount}**`
+                )
+                .setColor("DarkRed"),
+            ],
+            components: [],
+          });
+        } catch (err) {
+          console.error("❌ Clear command error:", err);
+          await i.update({
+            content: "⚠️ An error occurred while clearing data.",
+            components: [],
+          });
+        }
+        collector.stop();
+      }
+    });
+
+    collector.on("end", async collected => {
+      if (collected.size === 0) {
+        await interaction.editReply({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle("⌛ Timed Out")
+              .setDescription("You didn’t confirm in time. Operation cancelled.")
+              .setColor("Grey"),
+          ],
+          components: [],
+        });
+      }
+    });
+  },
 };

@@ -7,7 +7,15 @@ module.exports = async (client, interaction) => {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
       await command.execute(interaction, client);
-    } else if (interaction.isButton()) {
+    } else if (interaction.isAutocomplete()) {
+      const command = client.commands.get(interaction.commandName);
+      if (!command || !command.autocomplete) return;
+      try {
+        await command.autocomplete(interaction);
+      } catch (err) {
+        console.error("❌ Autocomplete error:", err);
+      }
+    }else if (interaction.isButton()) {
       if (interaction.customId.startsWith("claim_")) {
         const user = await User.findOne({
           userId: interaction.user.id,
@@ -16,7 +24,7 @@ module.exports = async (client, interaction) => {
 
         if (!user || !user.race) {
           return interaction.reply({
-            content: "⚠️ You must choose a race before claiming cards!",
+            content: "⚠️ You must belong to a race before claiming cards!",
             ephemeral: true,
           });
         }
