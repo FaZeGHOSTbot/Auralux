@@ -7,10 +7,14 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction, client) {
-    const ownerId = process.env.OWNER_ID; // add your Discord ID in .env
-    if (interaction.user.id !== ownerId) {
-      return interaction.reply({ content: "❌ Only the owner can use this command.", ephemeral: true });
-    }
+   const ownerIds = process.env.OWNER_ID.split(",").map(id => id.trim());
+
+if (!ownerIds.includes(interaction.user.id)) {
+  return interaction.reply({
+    content: "❌ Only the bot owner(s) can use this command.",
+    ephemeral: true,
+  });
+}
 
     await interaction.deferReply({ ephemeral: true });
     await client.spawnManager.spawnCard(interaction.channel);

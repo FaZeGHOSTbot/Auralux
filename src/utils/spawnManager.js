@@ -3,6 +3,8 @@ const User = require("../models/user");
 const fs = require("fs");
 const path = require("path");
 const GlobalCounter = require("../models/globalCounter");
+const GuildConfig = require("../models/guildConfig");
+
 
 
 // 🔁 Load ALL character JSONs from data/characters/
@@ -32,7 +34,7 @@ try {
 const RARITY_LEVELS = {
   mortal:    { chance: 60,  color: 0x3498db, emoji: "🩶", multiplier: 1.0 },
   ascended:  { chance: 30,  color: 0x3498db, emoji: "💠", multiplier: 1.2 },
-  legendary: { chance: 3,   color: 0xE67E22, emoji: "🔥", multiplier: 1.5 }, // NEW
+  legendary: { chance: 3,   color: 0x3498db, emoji: "🔥", multiplier: 1.5 }, // NEW
   mythic:    { chance: 0.5,   color: 0x3498db, emoji: "💜", multiplier: 2.0 },
   divine:    { chance: 0.1, color: 0x3498db, emoji: "✨", multiplier: 2.5 },
 };
@@ -108,25 +110,93 @@ function scaleStats(baseStats, sp, level, rarity) {
 }
 
 class SpawnManager {
-  constructor(client) {
-    this.client = client;
-    this.spawnedCards = new Map();
-    this.messageCounter = new Map();
-  }
+constructor(client) {
+  this.client = client;
+  this.spawnedCards = new Map();
+  this.messageCounter = new Map();
+  this.lastMessageTime = new Map();
+  this.IDLE_THRESHOLD = 1 * 60 * 1000; // 1 minute
+  this.AUTO_SPAWN_INTERVAL = 30 * 1000; // check every 30 sec (recommended)
+
+  this.client.once("ready", async () => {
+    console.log("✅ Idle spawn system activated.");
+
+    // ✅ Wait a few seconds for guilds to cache fully
+    setTimeout(() => {
+      console.log(`💤 Tracking ${this.client.guilds.cache.size} guilds for idle spawns.`);
+      setInterval(() => this.checkIdleServers(), this.AUTO_SPAWN_INTERVAL);
+    }, 5000);
+  });
+}
+
+
 
   async handleMessage(message) {
-    if (message.author.bot || !message.guild) return;
+  if (message.author.bot || !message.guild) return;
+  this.lastMessageTime.set(message.guild.id, Date.now());
 
-    const guildId = message.guild.id;
-    const count = (this.messageCounter.get(guildId) || 0) + 1;
-    this.messageCounter.set(guildId, count);
+  const guildId = message.guild.id;
+  const count = (this.messageCounter.get(guildId) || 0) + 1;
+  this.messageCounter.set(guildId, count);
 
-    const randomInterval = Math.floor(Math.random() * 3) + 5;
-    if (count >= randomInterval) {
-      this.messageCounter.set(guildId, 0);
-      await this.spawnCard(message.channel);
+  const randomInterval = Math.floor(Math.random() * 3) + 5;
+  if (count >= randomInterval) {
+    this.messageCounter.set(guildId, 0);
+
+    // 🧩 Check if a custom spawn channel is set
+    const config = await GuildConfig.findOne({ guildId });
+    let spawnChannel = message.channel; // default to current
+
+    if (config?.spawnChannelId) {
+      const channel = message.guild.channels.cache.get(config.spawnChannelId);
+      if (channel && channel.isTextBased()) spawnChannel = channel;
+    }
+
+    await this.spawnCard(spawnChannel);
+  }
+}
+
+
+async checkIdleServers() {
+  const now = Date.now();
+
+  for (const [guildId, guild] of this.client.guilds.cache) {
+    const lastActive = this.lastMessageTime.get(guildId) || 0;
+    const idleTime = now - lastActive;
+
+    // 🆕 Treat never-active guilds as idle immediately
+    if (lastActive === 0 || idleTime >= this.IDLE_THRESHOLD) {
+      const config = await GuildConfig.findOne({ guildId });
+let defaultChannel = null;
+
+if (config?.spawnChannelId) {
+  defaultChannel = guild.channels.cache.get(config.spawnChannelId);
+} else {
+  defaultChannel =
+    guild.systemChannel ||
+    guild.channels.cache.find(
+      ch =>
+        ch.isTextBased() &&
+        ch.permissionsFor(guild.members.me)?.has("SendMessages")
+    );
+}
+
+
+      if (!defaultChannel) continue;
+
+      const activeSpawn = this.spawnedCards.get(defaultChannel.id);
+      if (activeSpawn && !activeSpawn.claimed) continue;
+
+      console.log(`[SPAWN] Idle spawn triggered in ${guild.name}`);
+      await this.spawnCard(defaultChannel);
+
+      // 🕒 Reset activity so it doesn’t spawn again instantly
+      this.lastMessageTime.set(guildId, now);
     }
   }
+}
+
+
 
 async spawnCard(channel, forcedData = null) {
     if (forcedData?.forced) {

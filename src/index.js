@@ -35,8 +35,6 @@ const client = new Client({
 });
 
 // ---------------- Load Event Logs ----------------
-const logs = require("./events/log");
-logs(client);
 
 // 🔥 Load interactionCreate event manually
 client.on("interactionCreate", (interaction) => 
