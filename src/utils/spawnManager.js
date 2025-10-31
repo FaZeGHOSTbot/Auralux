@@ -324,12 +324,11 @@ async handleClaim(interaction) {
 
     const scaledStats = scaleStats(raceVariant.baseStats, sp, cardLevel, rarity);
 
-    // 📘 Fetch or create user
-    const user = await User.findOneAndUpdate(
-      { userId: interaction.user.id},
-      { $setOnInsert: { userId: interaction.user.id, userCardCounter: 0 } },
-      { upsert: true, new: true }
-    );
+      // 📘 Fetch or create user
+      let user = await User.findOne({ userId: interaction.user.id });
+      if (!user) {
+        user = new User({ userId: interaction.user.id, userCardCounter: 0 });
+      }
 
     // 🌐 Get next global card ID
     const globalCounter = await GlobalCounter.findOneAndUpdate(
