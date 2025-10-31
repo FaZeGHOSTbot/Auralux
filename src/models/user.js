@@ -16,6 +16,7 @@
 
         // 📈 Card Level
       level: { type: Number, default: 1 },
+      xp: { type: Number, default: 0 },
 
       // ⚔️ Character Stats
       stats: {
@@ -41,6 +42,21 @@
 
       userCardCounter: { type: Number, default: 0 }, // 🔥 New counter
       cards: [cardSchema],
+
+      selectedCardId: { type: Number, default: null },
+
+      filters: {
+    type: new mongoose.Schema({
+      levelup: {
+        rarity: { type: [String], default: [] },
+        race: { type: [String], default: [] },
+        nameIncludes: { type: [String], default: [] },
+        nameExcludes: { type: [String], default: [] },
+        lastMode: { type: String, default: "smart" }
+      }
+    }, { _id: false }),
+    default: {}
+  }
     });
 
     // 🧩 Avoid OverwriteModelError when reloading

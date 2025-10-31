@@ -1,0 +1,142 @@
+[
+  {
+    "name": "Albedo",
+    "races": {
+      "human": {
+        "baseStats": {
+          "attack": 130,
+          "defense": 150,
+          "speed": 110,
+          "hp": 160,
+          "magic": 145,
+          "spirit": 155
+        },
+        "rarities": {
+          "mortal": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761949006/mortal_bloeg7.jpg"
+          },
+          "ascended": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761949016/ascend_fbh2ij.jpg"
+          },
+          "legendary": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761949005/legendary_txwft0.jpg"
+          },
+          "mythic": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761949015/mythic_eucxxw.jpg"
+          },
+          "divine": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761949004/divine_ub9jig.jpg"
+          }
+        }
+      },
+      "demon": {
+        "baseStats": {
+          "attack": 180,
+          "defense": 140,
+          "speed": 105,
+          "hp": 160,
+          "magic": 155,
+          "spirit": 110
+        },
+        "rarities": {
+          "mortal": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761949411/mortal_z8c5lz.jpg"
+          },
+          "ascended": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761949411/ascend_j9b5ya.jpg"
+          },
+          "legendary": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761949411/legendary_fy6d8c.jpg"
+          },
+          "mythic": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761949413/mythic_wraund.jpg"
+          },
+          "divine": {
+            "image": "hhttps://res.cloudinary.com/drzutl9jv/image/upload/v1761949410/divine_w70uxd.jpg"
+          }
+        }
+      },
+      "vampire": {
+        "baseStats": {
+          "attack": 160,
+          "defense": 130,
+          "speed": 135,
+          "hp": 115,
+          "magic": 165,
+          "spirit": 130
+        },
+        "rarities": {
+          "mortal": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761948714/mortal_hhizrd.jpg"
+          },
+          "ascended": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761948716/ascend_nbcmkv.jpg"
+          },
+          "legendary": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761948714/legendary_zgrjkj.jpg"
+          },
+          "mythic": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761948715/mythic_otenbs.jpg"
+          },
+          "divine": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761948713/divine_zfk0lc.jpg"
+          }
+        }
+      },
+      "elf": {
+        "baseStats": {
+          "attack": 130,
+          "defense": 100,
+          "speed": 135,
+          "hp": 140,
+          "magic": 190,
+          "spirit": 155
+        },
+        "rarities": {
+          "mortal": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761948519/mortal_rel6uw.jpg"
+          },
+          "ascended": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761948520/ascend_bn5njb.jpg"
+          },
+          "legendary": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761948520/legendary_rxx66p.jpg"
+          },
+          "mythic": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761948519/mythic_tlx5xf.jpg"
+          },
+          "divine": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761948520/divine_z0vco8.jpg"
+          }
+        }
+      },
+      "celestial": {
+        "baseStats": {
+          "attack": 140,
+          "defense": 115,
+          "speed": 120,
+          "hp": 130,
+          "magic": 200,
+          "spirit": 145
+        },
+        "rarities": {
+          "mortal": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761949696/mortal_qojzpt.jpg"
+          },
+          "ascended": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761949692/ascend_r2lzfd.jpg"
+          },
+          "legendary": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761949695/legendary_cxmhph.jpg"
+          },
+          "mythic": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761949698/mythic_zmoiyo.jpg"
+          },
+          "divine": {
+            "image": "https://res.cloudinary.com/drzutl9jv/image/upload/v1761949692/divine_xyfzcq.jpg"
+          }
+        }
+      }
+    }
+  }
+]

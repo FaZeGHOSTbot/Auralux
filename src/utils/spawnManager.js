@@ -4,12 +4,15 @@ const fs = require("fs");
 const path = require("path");
 const GlobalCounter = require("../models/globalCounter");
 const GuildConfig = require("../models/guildConfig");
+const { levelUpCard } = require("../utils/leveling"); // adjust path if needed
+
 
 
 
 // 🔁 Load ALL character JSONs from data/characters/
 const charactersDir = path.join(__dirname, "../data/characters");
 let cardsData = [];
+
 
 try {
   const files = fs.readdirSync(charactersDir).filter(f => f.endsWith(".json"));
@@ -33,10 +36,10 @@ try {
 // 🎚️ Rarity system
 const RARITY_LEVELS = {
   mortal:    { chance: 60,  color: 0x3498db, emoji: "🩶", multiplier: 1.0 },
-  ascended:  { chance: 30,  color: 0x3498db, emoji: "💠", multiplier: 1.2 },
-  legendary: { chance: 3,   color: 0x3498db, emoji: "🔥", multiplier: 1.5 }, // NEW
-  mythic:    { chance: 0.5,   color: 0x3498db, emoji: "💜", multiplier: 2.0 },
-  divine:    { chance: 0.1, color: 0x3498db, emoji: "✨", multiplier: 2.5 },
+  ascended:  { chance: 30,  color: 0x3498db, emoji: "💠", multiplier: 1.7 },
+  legendary: { chance: 3,   color: 0x3498db, emoji: "🔥", multiplier: 2.5 }, // NEW
+  mythic:    { chance: 0.5,   color: 0x3498db, emoji: "💜", multiplier: 3.8 },
+  divine:    { chance: 0.1, color: 0x3498db, emoji: "✨", multiplier: 5.5 },
 };
 
 // 🎲 Random rarity generator
@@ -99,15 +102,29 @@ function getSPBar(sp) {
 
 // 📈 Scale stats using rarity × SP × Level
 function scaleStats(baseStats, sp, level, rarity) {
-  const rarityMultiplier = RARITY_LEVELS[rarity]?.multiplier || 1.0;
-  const spMultiplier = 0.5 + (sp / 100); // SP affects 0.5x → 1.5x
-  const levelMultiplier = 1 + (level - 1) * 0.05; // +5% per level
+  const rarityPower = {
+    mortal: 1.0,
+    ascended: 1.6,
+    legendary: 2.4,
+    mythic: 3.5,
+    divine: 4.5,
+  }[rarity] || 1.0;
+
+  // Level scaling — exponential but capped (smooth at start, sharp near 100)
+  const levelMultiplier = 1 + Math.pow(level / 100, 1.3) * 2.5;
+
+  // SP scaling — gives individuality (0.5x to 1.5x)
+  const spMultiplier = 0.5 + sp / 100;
+
   const scaled = {};
   for (const [key, val] of Object.entries(baseStats)) {
-    scaled[key] = Math.floor(val * spMultiplier * levelMultiplier * rarityMultiplier);
+    scaled[key] = Math.floor(val * rarityPower * levelMultiplier * spMultiplier);
   }
+
   return scaled;
 }
+
+
 
 class SpawnManager {
 constructor(client) {
@@ -153,6 +170,11 @@ constructor(client) {
     }
 
     await this.spawnCard(spawnChannel);
+    await User.updateMany(
+  { "cards.levelValue": { $exists: true } },
+  { $rename: { "cards.$[].levelValue": "cards.$[].level" } }
+);
+
   }
 }
 
@@ -298,14 +320,14 @@ async handleClaim(interaction) {
 
     // 🎲 Generate random stats
     const sp = getRandomSP();
-    const levelValue = forced ? (level || 1) : Math.floor(Math.random() * 10) + 1;
+    const cardLevel = forced ? (level || 1) : Math.floor(Math.random() * 10) + 1;
 
-    const scaledStats = scaleStats(raceVariant.baseStats, sp, levelValue, rarity);
+    const scaledStats = scaleStats(raceVariant.baseStats, sp, cardLevel, rarity);
 
     // 📘 Fetch or create user
     const user = await User.findOneAndUpdate(
-      { userId: interaction.user.id, guildId: interaction.guild.id },
-      { $setOnInsert: { userId: interaction.user.id, guildId: interaction.guild.id, userCardCounter: 0 } },
+      { userId: interaction.user.id},
+      { $setOnInsert: { userId: interaction.user.id, userCardCounter: 0 } },
       { upsert: true, new: true }
     );
 
@@ -330,11 +352,53 @@ async handleClaim(interaction) {
       imageUrl: raceVariant.rarities[rarity]?.image || raceVariant.image || null,
       soulPotential: sp,
       stats: scaledStats,
-      levelValue,
+      level: cardLevel,
     };
 
     user.cards.push(newCard);
     await user.save();
+
+// 🌟 Award XP to user's selected champion (primary card)
+if (user.selectedCardId) {
+  const selectedCard = user.cards.find(c => c.userCardId === user.selectedCardId);
+
+  if (selectedCard) {
+    // 💎 Dynamic XP Reward Table (rarer cards = more XP)
+    const rarityXPRewards = {
+      mortal: 150,
+      ascended: 500,
+      legendary: 1500,
+      mythic: 4000,
+      divine: 9000,
+    };
+
+    // Base XP from rarity of the claimed card
+    let gainedXP = rarityXPRewards[rarity] || 100;
+
+    // 🌈 Bonus from SP of the claimed card (0.5× to 1.5×)
+    const spMultiplier = 0.5 + (sp / 100);
+    gainedXP = Math.floor(gainedXP * spMultiplier);
+
+    // 🧮 Leveling logic
+    const oldLevel = selectedCard.level;
+    levelUpCard(selectedCard, gainedXP);
+    await user.save();
+
+    // ✨ Public XP message
+    let msg = `💫 **${interaction.user.username}'s** champion **${selectedCard.name}** gained **${gainedXP.toLocaleString()} XP**!`;
+    if (selectedCard.level > oldLevel)
+      msg += ` 🎉 It leveled up to **Lv. ${selectedCard.level}**!`;
+
+    await interaction.channel.send(msg);
+  }
+} else {
+  // 🚫 No champion selected
+  await interaction.channel.send(
+    `⚠️ **${interaction.user.username}**, you don’t have a champion selected!\nUse **/champion select <id>** to set one and start gaining XP.`
+  );
+}
+
+
 
     // 🧾 Mark spawn as claimed
     spawnData.claimed = true;
@@ -362,7 +426,7 @@ async handleClaim(interaction) {
     await interaction.channel.send(
       `🎉 **${interaction.user.username}** has claimed **${card.name}** ` +
       `(${race.charAt(0).toUpperCase() + race.slice(1)}) — ${rarityDisplay} card!\n` +
-      `🧬 **Soul Potential:** ${sp}% | 🗡️ **Level:** ${levelValue}`
+      `🧬 **Soul Potential:** ${sp}% | 🗡️ **Level:** ${cardLevel}`
     );
 
     await interaction.editReply({

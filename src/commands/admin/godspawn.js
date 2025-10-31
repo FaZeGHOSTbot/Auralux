@@ -20,7 +20,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("godspawn")
     .setDescription("Force spawn a specific card (Owner only)")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption(option =>
       option.setName("name")
         .setDescription("Character name")

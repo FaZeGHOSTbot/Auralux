@@ -19,7 +19,6 @@ module.exports = async (client, interaction) => {
       if (interaction.customId.startsWith("claim_")) {
         const user = await User.findOne({
           userId: interaction.user.id,
-          guildId: interaction.guild.id,
         });
 
         if (!user || !user.race) {
