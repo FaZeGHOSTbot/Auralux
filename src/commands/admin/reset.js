@@ -24,27 +24,27 @@ module.exports = {
     const target = interaction.options.getString("target");
 
     try {
-      // ✅ Reset everyone globally
       if (target.toLowerCase() === "all") {
-        await User.updateMany({}, {
-          $set: {
-            cards: [],
-            xp: 0,
-            level: 1,
-            selectedCardId: null,
-            userCardCounter: 0,
-          },
-        });
+  const users = await User.find({});
+  for (const user of users) {
+    user.cards = [];
+    user.xp = 0;
+    user.level = 1;
+    user.selectedCardId = null;
+    user.userCardCounter = 0;
+    await user.save();
+  }
 
-        const embed = new EmbedBuilder()
-          .setColor("Red")
-          .setTitle("🌍 Global Player Reset")
-          .setDescription(`All player data (cards, XP, levels) have been reset globally.`)
-          .setFooter({ text: `Reset by ${interaction.user.tag}` })
-          .setTimestamp();
+  const embed = new EmbedBuilder()
+    .setColor("Red")
+    .setTitle("🌍 Global Player Reset")
+    .setDescription(`All player data (cards, XP, levels) have been reset globally.`)
+    .setFooter({ text: `Reset by ${interaction.user.tag}` })
+    .setTimestamp();
 
-        return interaction.reply({ embeds: [embed] });
-      }
+  return interaction.reply({ embeds: [embed] });
+}
+
 
       // ✅ Reset single user by ID
       const userId = target;

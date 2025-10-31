@@ -306,7 +306,9 @@ async spawnCard(channel, forcedData = null) {
 
 async handleClaim(interaction) {
   try {
-    await interaction.deferReply({ ephemeral: true });
+  if (interaction.replied || interaction.deferred) return; // already handled
+  await interaction.deferReply({ flags: 64 }).catch(() => {});
+
 
     const channelId = interaction.channel.id;
     const spawnData = this.spawnedCards.get(channelId);
@@ -434,15 +436,22 @@ if (user.selectedCardId) {
 
     this.spawnedCards.delete(channelId);
 
-  } catch (err) {
-    console.error("❌ Interaction Error:", err);
-    if (!interaction.replied) {
+} catch (err) {
+  console.error("❌ Interaction Error:", err);
+  try {
+    if (!interaction.deferred && !interaction.replied) {
       await interaction.reply({
         content: "⚠️ Something went wrong.",
-        ephemeral: true,
-      }).catch(() => null);
+        flags: 64, // ephemeral
+      });
+    } else {
+      await interaction.editReply({ content: "⚠️ Something went wrong (handled gracefully)." });
     }
+  } catch (e) {
+    console.warn("⚠️ Failed to send error reply:", e.message);
   }
+}
+
 }
 
 
