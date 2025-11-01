@@ -19,7 +19,7 @@ module.exports = {
     const ownerId = ["424568410765262848",
                     "644600955295498249",
                     "386109687692656640",
-                  "729614323978207323" ]; // 🔒 Replace with your Discord ID
+                  "722429663435030618" ]; // 🔒 Replace with your Discord ID
     if (interaction.user.id !== ownerId)
       return interaction.reply({
         content: "🚫 This command is only available to the bot owner.",

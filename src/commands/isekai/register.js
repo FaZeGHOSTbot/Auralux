@@ -33,7 +33,7 @@ module.exports = {
       { name: "Human", description: "Resourceful and resilient, thriving in all lands." },
       { name: "Elf", description: "Masters of nature, moving gracefully through forests." },
       { name: "Demon", description: "Cunning beings from the depths of chaos." },
-      { name: "Angel", description: "Radiant protectors watching over the realms." },
+      { name: "god", description: "Radiant protectors watching over the realms." },
       { name: "Vampire", description: "Eternal hunters of the night, elegant and feared." },
     ];
 
@@ -66,7 +66,7 @@ module.exports = {
       }
 
       if (reaction.emoji.name === "✅") {
-        await msg.edit({ content: "⚡ The gods are deciding your fate...", embeds: [] });
+        await msg.edit({ content: "⚡ Truck-kun is deciding your fate...", embeds: [] });
 
         setTimeout(async () => {
           const chosenRace =

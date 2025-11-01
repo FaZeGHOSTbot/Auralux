@@ -17,7 +17,7 @@ module.exports = {
             "424568410765262848", // 👈 replace this with your Discord user ID
             "644600955295498249",
             "386109687692656640",
-            "729614323978207323"  // add more if needed
+            "722429663435030618"  // add more if needed
         ];
 
         if (!allowedOwners.includes(interaction.user.id)) {
