@@ -7,7 +7,7 @@
       userCardId: { type: Number, required: true },
       name: { type: String, required: true }, // e.g., "Gojo Satoru"
       race: { type: String, required: true }, // e.g., "demon", "angel", etc.
-      rarity: { type: String, default: "common" }, // can be updated later for rarity system
+      rarity: { type: String, default: "mortal" }, // can be updated later for rarity system
       imageUrl: { type: String, required: true },
 
       // 💠 Soul System (we can expand this later)

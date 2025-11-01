@@ -6,13 +6,9 @@ const GlobalCounter = require("../models/globalCounter");
 const GuildConfig = require("../models/guildConfig");
 const { levelUpCard } = require("../utils/leveling"); // adjust path if needed
 
-
-
-
 // 🔁 Load ALL character JSONs from data/characters/
 const charactersDir = path.join(__dirname, "../data/characters");
 let cardsData = [];
-
 
 try {
   const files = fs.readdirSync(charactersDir).filter(f => f.endsWith(".json"));
@@ -66,26 +62,34 @@ function gaussianRandom(mean = 0, stdDev = 1) {
   return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v) * stdDev + mean;
 }
 
-function gaussianRandom(mean = 0, stdDev = 1) {
-  let u = 0, v = 0;
-  while (u === 0) u = Math.random();
-  while (v === 0) v = Math.random();
-  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v) * stdDev + mean;
-}
-
 function getRandomSP() {
-  const sigma = 9; // increased from 7 → wider tails
+  const sigma = 10; // tighter curve — most values near 50%
   let sp = gaussianRandom(50, sigma);
 
-  // increased rare-extreme chance
-  if (Math.random() < 0.004) { // 0.4% total (0.2% low + 0.2% high)
-    sp = Math.random() < 0.5
-      ? Math.random() * 5         // 0–5%
-      : 95 + Math.random() * 5;   // 95–100%
+  const roll = Math.random();
+
+  // 🌌 Symmetric rare extremes
+  if (roll < 0.01) {
+    // 1% chance: 0–5% (ultra-cursed)
+    sp = Math.random() * 5;
+  } else if (roll < 0.02) {
+    // 1% chance: 95–100% (godlike)
+    sp = 95 + Math.random() * 5;
+  } else if (roll < 0.06) {
+    // 4%: 5–20% (weak souls)
+    sp = 5 + Math.random() * 15;
+  } else if (roll > 0.94 && roll < 0.98) {
+    // 4%: 80–95% (strong souls)
+    sp = 80 + Math.random() * 15;
+  } else {
+    // ~90%: Gaussian center (35–65%)
+    sp = gaussianRandom(50, sigma);
   }
 
   return Math.min(99.99, Math.max(0.1, parseFloat(sp.toFixed(2))));
 }
+
+
 
 
 
@@ -250,16 +254,17 @@ async spawnCard(channel, forcedData = null) {
 
     const msg = await channel.send({ embeds: [spawnEmbed], components: [row] });
 
-    this.spawnedCards.set(channel.id, {
-      card,
-      race,
-      rarity,
-      level,
-      imageUrl,
-      messageId: msg.id,
-      claimed: false,
-      forced: true,
-    });
+this.spawnedCards.set(msg.id, {
+  card,
+  race,
+  rarity,
+  level,
+  imageUrl,
+  messageId: msg.id,
+  claimed: false,
+  forced: true,
+});
+
 
     return; // ✅ Exit early (skip random logic)
   }
@@ -294,7 +299,7 @@ async spawnCard(channel, forcedData = null) {
 
   const msg = await channel.send({ embeds: [spawnEmbed], components: [row] });
 
-  this.spawnedCards.set(channel.id, {
+  this.spawnedCards.set(msg.id, {
     card: randomCardData,
     race: chosenRace,
     rarity, // still store actual rarity for claim
@@ -305,50 +310,58 @@ async spawnCard(channel, forcedData = null) {
 
 
 async handleClaim(interaction) {
+  // Each spawn has its own unique message ID
+  const messageId = interaction.message.id;
+  const spawnData = this.spawnedCards.get(messageId);
+
+  // 🧱 Check existence early
+  if (!spawnData) {
+    return interaction.reply({
+      content: "❌ There’s no claimable card right now!",
+      ephemeral: true,
+    });
+  }
+
+  // 🔒 ATOMIC LOCK — prevent double claims per message
+  if (spawnData.claimed) {
+    return interaction.reply({
+      content: "❌ Too late! Someone already claimed this card.",
+      ephemeral: true,
+    });
+  }
+  spawnData.claimed = true;
+  this.spawnedCards.set(messageId, spawnData);
+
   try {
-  if (interaction.replied || interaction.deferred) return; // already handled
-  await interaction.deferReply({ flags: 64 }).catch(() => {});
+    await interaction.deferReply({ ephemeral: true });
 
-
-    const channelId = interaction.channel.id;
-    const spawnData = this.spawnedCards.get(channelId);
-
-    if (!spawnData || spawnData.claimed) {
-      return await interaction.editReply({ content: "❌ There’s no claimable card right now!" });
-    }
-
-    const { card, race, rarity,level,forced } = spawnData;
+    const { card, race, rarity, level, forced } = spawnData;
     const raceVariant = card.races[race];
 
-    // 🎲 Generate random stats
+    // 🎲 Generate SP + stats
     const sp = getRandomSP();
     const cardLevel = forced ? (level || 1) : Math.floor(Math.random() * 10) + 1;
-
     const scaledStats = scaleStats(raceVariant.baseStats, sp, cardLevel, rarity);
 
-      // 📘 Fetch or create user
-      let user = await User.findOne({ userId: interaction.user.id });
-      if (!user) {
-        user = new User({ userId: interaction.user.id, userCardCounter: 0 });
-      }
+    // 📘 Fetch or create user
+    let user = await User.findOne({ userId: interaction.user.id });
+    if (!user) user = new User({ userId: interaction.user.id, userCardCounter: 0 });
 
-    // 🌐 Get next global card ID
+    // 🌐 Increment global + user counters
     const globalCounter = await GlobalCounter.findOneAndUpdate(
       { name: "globalCardId" },
       { $inc: { value: 1 } },
       { new: true, upsert: true }
     );
     const globalCardId = globalCounter.value;
-
-    // 🔢 Increment user's card counter
     user.userCardCounter = (user.userCardCounter || 0) + 1;
 
-    // 🆕 Create new card entry
+    // 🆕 Build new card
     const newCard = {
       globalCardId,
       userCardId: user.userCardCounter,
       name: card.name,
-      race, // keep spawned race, not user’s
+      race,
       rarity,
       imageUrl: raceVariant.rarities[rarity]?.image || raceVariant.image || null,
       soulPotential: sp,
@@ -359,53 +372,38 @@ async handleClaim(interaction) {
     user.cards.push(newCard);
     await user.save();
 
-// 🌟 Award XP to user's selected champion (primary card)
-if (user.selectedCardId) {
-  const selectedCard = user.cards.find(c => c.userCardId === user.selectedCardId);
+    // 🏆 XP gain if champion selected
+    if (user.selectedCardId) {
+      const selectedCard = user.cards.find(c => c.userCardId === user.selectedCardId);
+      if (selectedCard) {
+        const rarityXPRewards = {
+          mortal: 150,
+          ascended: 500,
+          legendary: 1500,
+          mythic: 4000,
+          divine: 9000,
+        };
+        let gainedXP = rarityXPRewards[rarity] || 100;
+        const spMultiplier = 0.5 + (sp / 100);
+        gainedXP = Math.floor(gainedXP * spMultiplier);
 
-  if (selectedCard) {
-    // 💎 Dynamic XP Reward Table (rarer cards = more XP)
-    const rarityXPRewards = {
-      mortal: 150,
-      ascended: 500,
-      legendary: 1500,
-      mythic: 4000,
-      divine: 9000,
-    };
+        const oldLevel = selectedCard.level;
+        levelUpCard(selectedCard, gainedXP);
+        await user.save();
 
-    // Base XP from rarity of the claimed card
-    let gainedXP = rarityXPRewards[rarity] || 100;
+        let msg = `💫 **${interaction.user.username}'s** champion **${selectedCard.name}** gained **${gainedXP.toLocaleString()} XP**!`;
+        if (selectedCard.level > oldLevel)
+          msg += ` 🎉 It leveled up to **Lv. ${selectedCard.level}**!`;
+        await interaction.channel.send(msg);
+      }
+    } else {
+      await interaction.channel.send(
+        `⚠️ **${interaction.user.username}**, you don’t have a champion selected!\nUse **/champion select <id>** to set one.`
+      );
+    }
 
-    // 🌈 Bonus from SP of the claimed card (0.5× to 1.5×)
-    const spMultiplier = 0.5 + (sp / 100);
-    gainedXP = Math.floor(gainedXP * spMultiplier);
-
-    // 🧮 Leveling logic
-    const oldLevel = selectedCard.level;
-    levelUpCard(selectedCard, gainedXP);
-    await user.save();
-
-    // ✨ Public XP message
-    let msg = `💫 **${interaction.user.username}'s** champion **${selectedCard.name}** gained **${gainedXP.toLocaleString()} XP**!`;
-    if (selectedCard.level > oldLevel)
-      msg += ` 🎉 It leveled up to **Lv. ${selectedCard.level}**!`;
-
-    await interaction.channel.send(msg);
-  }
-} else {
-  // 🚫 No champion selected
-  await interaction.channel.send(
-    `⚠️ **${interaction.user.username}**, you don’t have a champion selected!\nUse **/champion select <id>** to set one and start gaining XP.`
-  );
-}
-
-
-
-    // 🧾 Mark spawn as claimed
-    spawnData.claimed = true;
+    // 🖼️ Update spawn embed
     const rarityInfo = RARITY_LEVELS[rarity];
-
-    // 🖼️ Update spawn embed to show claimed
     const claimedEmbed = new EmbedBuilder()
       .setTitle(`${rarityInfo.emoji} ${card.name} has been claimed!`)
       .setDescription(
@@ -416,13 +414,13 @@ if (user.selectedCardId) {
       .setColor(rarityInfo.color)
       .setFooter({ text: "Added to the collection!" });
 
-    // ✏️ Update original spawn message
+    // ✏️ Edit the specific spawn message
     await interaction.channel.messages
-      .fetch(spawnData.messageId)
+      .fetch(messageId)
       .then(msg => msg.edit({ embeds: [claimedEmbed], components: [] }))
       .catch(() => null);
 
-    // 🎉 Notify the channel
+    // 🎉 Public announcement
     const rarityDisplay = `${rarityInfo.emoji} **${rarity.toUpperCase()}**`;
     await interaction.channel.send(
       `🎉 **${interaction.user.username}** has claimed **${card.name}** ` +
@@ -434,25 +432,23 @@ if (user.selectedCardId) {
       content: `✅ You successfully claimed **${card.name}** (${rarity.toUpperCase()})!`,
     });
 
-    this.spawnedCards.delete(channelId);
+    // 🧹 Clean up only this message entry
+    this.spawnedCards.delete(messageId);
+  } catch (err) {
+    console.error("❌ Claim Error:", err);
+    const rollback = this.spawnedCards.get(messageId);
+    if (rollback && rollback.claimed) rollback.claimed = false;
 
-} catch (err) {
-  console.error("❌ Interaction Error:", err);
-  try {
-    if (!interaction.deferred && !interaction.replied) {
+    if (!interaction.replied) {
       await interaction.reply({
-        content: "⚠️ Something went wrong.",
-        flags: 64, // ephemeral
-      });
-    } else {
-      await interaction.editReply({ content: "⚠️ Something went wrong (handled gracefully)." });
+        content: "⚠️ Something went wrong while claiming.",
+        ephemeral: true,
+      }).catch(() => null);
     }
-  } catch (e) {
-    console.warn("⚠️ Failed to send error reply:", e.message);
   }
 }
 
-}
+
 
 
 
