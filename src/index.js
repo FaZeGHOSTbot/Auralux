@@ -1,5 +1,5 @@
 require("dotenv").config();
-const BOT_ACTIVE = String(process.env.BOT_ACTIVE || "").toLowerCase() === "true";
+const BOT_ACTIVE = String(process.env.BOT_ACTIVE || "").toLowerCase() === "false";
 const fs = require("fs");
 const path = require("path");
 const { Client, Collection, IntentsBitField, REST, Routes, Partials } = require("discord.js");

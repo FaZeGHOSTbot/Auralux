@@ -9,16 +9,9 @@ function loadCharacters() {
   const data = [];
   for (const file of files) {
     const filePath = path.join(charactersDir, file);
-    try {
-      const content = JSON.parse(fs.readFileSync(filePath, "utf8"));
-      if (Array.isArray(content)) {
-        data.push(...content.filter(c => c && c.name));
-      } else if (content && content.name) {
-        data.push(content);
-      }
-    } catch (err) {
-      console.error(`❌ Error parsing ${file}:`, err);
-    }
+    const content = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (Array.isArray(content)) data.push(...content);
+    else data.push(content);
   }
   return data;
 }
@@ -53,59 +46,41 @@ module.exports = {
     ),
 
   async autocomplete(interaction) {
-    try {
-      const focused = interaction.options.getFocused(true);
-      const allChars = loadCharacters();
-      const name = interaction.options.getString("name");
-      const race = interaction.options.getString("race");
-      let choices = [];
+    const focused = interaction.options.getFocused(true);
+    const allChars = loadCharacters();
+    const name = interaction.options.getString("name");
+    const race = interaction.options.getString("race");
+    let choices = [];
 
-      if (focused.name === "name") {
-        choices = allChars.map(c => c.name);
-      } else if (focused.name === "race" && name) {
-        const selected = allChars.find(
-          c => c.name.toLowerCase() === name.toLowerCase()
-        );
-        if (selected) choices = Object.keys(selected.races || {});
-      } else if (focused.name === "rarity" && name && race) {
-        const selected = allChars.find(
-          c => c.name.toLowerCase() === name.toLowerCase()
-        );
-        if (selected && selected.races && selected.races[race]) {
-          choices = Object.keys(selected.races[race].rarities || {});
-        }
-      }
-
-      const filtered = (choices || [])
-        .filter(choice =>
-          choice.toLowerCase().includes(focused.value.toLowerCase())
-        )
-        .slice(0, 25);
-
-      // ✅ Prevents double-response crash
-      if (!interaction.responded) {
-        await interaction.respond(
-          filtered.map(choice => ({ name: choice, value: choice }))
-        );
-      }
-    } catch (err) {
-      console.error("❌ Autocomplete error:", err);
-      // Fallback: respond empty if something went wrong
-      if (!interaction.responded) {
-        await interaction.respond([]);
+    if (focused.name === "name") {
+      choices = allChars.map(c => c.name);
+    } else if (focused.name === "race" && name) {
+      const selected = allChars.find(c => c.name.toLowerCase() === name.toLowerCase());
+      if (selected) choices = Object.keys(selected.races);
+    } else if (focused.name === "rarity" && name && race) {
+      const selected = allChars.find(c => c.name.toLowerCase() === name.toLowerCase());
+      if (selected && selected.races[race]) {
+        choices = Object.keys(selected.races[race].rarities);
       }
     }
+
+    const filtered = choices
+      .filter(choice => choice.toLowerCase().includes(focused.value.toLowerCase()))
+      .slice(0, 25);
+
+    await interaction.respond(filtered.map(choice => ({ name: choice, value: choice })));
   },
 
   async execute(interaction, client) {
-    const ownerIds = process.env.OWNER_ID.split(",").map(id => id.trim());
+   const ownerIds = process.env.OWNER_ID.split(",").map(id => id.trim());
 
-    if (!ownerIds.includes(interaction.user.id)) {
-      return interaction.reply({
-        content: "❌ Only the bot owner(s) can use this command.",
-        ephemeral: true,
-      });
-    }
+if (!ownerIds.includes(interaction.user.id)) {
+  return interaction.reply({
+    content: "❌ Only the bot owner(s) can use this command.",
+    ephemeral: true,
+  });
+}
+
 
     const name = interaction.options.getString("name");
     const race = interaction.options.getString("race")?.toLowerCase();
@@ -126,6 +101,7 @@ module.exports = {
 
     await interaction.deferReply({ ephemeral: true });
 
+    // ✅ Correct forced spawn structure
     const forcedData = {
       card: chosen,
       race,
@@ -135,10 +111,10 @@ module.exports = {
       forced: true,
     };
 
-    if (!client.spawnManager || typeof client.spawnManager.spawnCard !== "function") {
+    if (!client.spawnManager || typeof client.spawnManager.spawnCard !== "function")
       return interaction.followUp({ content: "⚠️ Spawn manager not initialized.", ephemeral: true });
-    }
 
+    // 🚀 Spawn directly using the forced card
     await client.spawnManager.spawnCard(interaction.channel, forcedData);
 
     await interaction.followUp({
